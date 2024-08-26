@@ -1,11 +1,13 @@
 package com.freshchat.consumer.sdk.flutter;
 
 
+import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 import android.content.BroadcastReceiver;
 
+import androidx.annotation.Nullable;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import android.content.IntentFilter;
@@ -14,6 +16,8 @@ import android.content.Intent;
 import androidx.annotation.NonNull;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.embedding.engine.plugins.activity.ActivityAware;
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
@@ -46,13 +50,12 @@ import java.util.HashMap;
 /**
  * FreshchatSdkPlugin
  */
-public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
+public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler, ActivityAware {
 
     public static final String PLUGIN_KEY = "com.freshchat.consumer.sdk.flutter";
 
     private MethodChannel channel;
     private FreshchatConfig freshchatConfig;
-    private Context context;
 
     private FreshchatSDKBroadcastReceiver restoreIdUpdatesReceiver;
     private FreshchatSDKBroadcastReceiver userActionsReceiver;
@@ -70,12 +73,34 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
     private static final String FRESHCHAT_ACTION_NOTIFICATION_INTERCEPTED = "FRESHCHAT_ACTION_NOTIFICATION_INTERCEPTED";
     private static final String FRESHCHAT_SET_TOKEN_TO_REFRESH_DEVICE_PROPERTIES = "FRESHCHAT_SET_TOKEN_TO_REFRESH_DEVICE_PROPERTIES";
     private static final String FRESHCHAT_ACTION_USER_INTERACTION = "FRESHCHAT_ACTION_USER_INTERACTION";
+    @Nullable
+    private Activity activity;
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
         setupPlugin(flutterPluginBinding.getApplicationContext(),
                 flutterPluginBinding.getBinaryMessenger(),
                 this);
+    }
+
+    @Override
+    public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
+        activity = binding.getActivity();
+    }
+
+    @Override
+    public void onDetachedFromActivityForConfigChanges() {
+
+    }
+
+    @Override
+    public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
+
+    }
+
+    @Override
+    public void onDetachedFromActivity() {
+        activity = null;
     }
 
     public static void register(@NonNull PluginRegistry registry) {
@@ -96,13 +121,12 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
     public static void setupPlugin(@NonNull Context context,
                                    @NonNull BinaryMessenger messenger,
                                    @NonNull FreshchatSdkPlugin freshchatSdkPlugin) {
-        freshchatSdkPlugin.context = context;
         freshchatSdkPlugin.channel = new MethodChannel(messenger, "freshchat_sdk");
         freshchatSdkPlugin.channel.setMethodCallHandler(freshchatSdkPlugin);
         freshchatSdkPlugin.restoreIdUpdatesReceiver = freshchatSdkPlugin.new FreshchatSDKBroadcastReceiver(context, Freshchat.FRESHCHAT_USER_RESTORE_ID_GENERATED);
         freshchatSdkPlugin.userActionsReceiver = freshchatSdkPlugin.new FreshchatSDKBroadcastReceiver(context, Freshchat.FRESHCHAT_EVENTS);
         freshchatSdkPlugin.messageCountUpdatesReceiver = freshchatSdkPlugin.new FreshchatSDKBroadcastReceiver(context, Freshchat.FRESHCHAT_ACTION_MESSAGE_COUNT_CHANGED);
-        freshchatSdkPlugin.notificationClickReceiver = freshchatSdkPlugin.new FreshchatSDKBroadcastReceiver(context,Freshchat.FRESHCHAT_ACTION_NOTIFICATION_INTERCEPTED);
+        freshchatSdkPlugin.notificationClickReceiver = freshchatSdkPlugin.new FreshchatSDKBroadcastReceiver(context, Freshchat.FRESHCHAT_ACTION_NOTIFICATION_INTERCEPTED);
         freshchatSdkPlugin.jwtRefreshEventReceiver = freshchatSdkPlugin.new FreshchatSDKBroadcastReceiver(context, Freshchat.FRESHCHAT_SET_TOKEN_TO_REFRESH_DEVICE_PROPERTIES);
     }
 
@@ -151,7 +175,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
             freshchatConfig.setUserEventsTrackingEnabled(userEventsTrackingEnabled);
             freshchatConfig.setCameraCaptureEnabled(cameraCaptureEnabled);
             freshchatConfig.setFileSelectionEnabled(fileSelectionEnabled);
-            Freshchat.getInstance(context).init(freshchatConfig);
+            Freshchat.getInstance(activity).init(freshchatConfig);
             result.success(null);
         } catch (Exception e) {
             result.error("FreshchatSdkPluginError", e.toString(), e);
@@ -161,23 +185,23 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
 
     public void showFAQ() {
         FaqOptions faqOptions = new FaqOptions();
-        Freshchat.showFAQs(context, faqOptions);
+        Freshchat.showFAQs(activity, faqOptions);
     }
 
     public void showConversations() {
-        Freshchat.showConversations(context);
+        Freshchat.showConversations(activity);
     }
 
     public String getFreshchatUserId() {
-        return Freshchat.getInstance(context).getFreshchatUserId();
+        return Freshchat.getInstance(activity).getFreshchatUserId();
     }
 
     public void resetUser() {
-        Freshchat.getInstance(context).resetUser(context);
+        Freshchat.getInstance(activity).resetUser(activity);
     }
 
     public void setUser(MethodCall call) {
-        final FreshchatUser freshchatUser = Freshchat.getInstance(context).getUser();
+        final FreshchatUser freshchatUser = Freshchat.getInstance(activity).getUser();
         try {
             String firstName = call.argument("firstName");
             String lastName = call.argument("lastName");
@@ -188,14 +212,14 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
             freshchatUser.setLastName(lastName);
             freshchatUser.setEmail(email);
             freshchatUser.setPhone(phoneCountryCode, phoneNumber);
-            Freshchat.getInstance(context).setUser(freshchatUser);
+            Freshchat.getInstance(activity).setUser(freshchatUser);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
     }
 
     public Map<String, String> getUser() {
-        final FreshchatUser freshchatUser = Freshchat.getInstance(context).getUser();
+        final FreshchatUser freshchatUser = Freshchat.getInstance(activity).getUser();
         Map<String, String> userDetails = new HashMap<>();
         userDetails.put("email", freshchatUser.getEmail());
         userDetails.put("firstName", freshchatUser.getFirstName());
@@ -210,7 +234,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
     public void setUserProperties(MethodCall call) {
         try {
             Map propertyMap = call.argument("propertyMap");
-            Freshchat.getInstance(context).setUserProperties(propertyMap);
+            Freshchat.getInstance(activity).setUserProperties(propertyMap);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -220,7 +244,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
         try {
             Map botVariablesMap = call.argument("botVariables");
             Map specificVariablesMap = call.argument("specificVariables");
-            Freshchat.getInstance(context).setBotVariables(botVariablesMap, specificVariablesMap);
+            Freshchat.getInstance(activity).setBotVariables(botVariablesMap, specificVariablesMap);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -257,7 +281,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
             faqOptions.showContactUsOnAppBar(showContactUsOnAppBar);
             faqOptions.showContactUsOnFaqNotHelpful(showContactUsOnFaqNotHelpful);
             faqOptions.filterContactUsByTags(contactUsTags, contactUsTitle);
-            Freshchat.showFAQs(context, faqOptions);
+            Freshchat.showFAQs(activity, faqOptions);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -268,7 +292,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
             String tag = call.argument("tag");
             String message = call.argument("message");
             FreshchatMessage freshchatMessage = new FreshchatMessage().setTag(tag).setMessage(message);
-            Freshchat.sendMessage(context, freshchatMessage);
+            Freshchat.sendMessage(activity, freshchatMessage);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -278,7 +302,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
         try {
             String eventName = call.argument("eventName");
             Map properties = call.argument("properties");
-            Freshchat.trackEvent(context, eventName, properties);
+            Freshchat.trackEvent(activity, eventName, properties);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -294,7 +318,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
                 result.success(unreadCountStatus);
             }
         };
-        Freshchat.getInstance(context).getUnreadCountAsync(unreadCountCallback);
+        Freshchat.getInstance(activity).getUnreadCountAsync(unreadCountCallback);
     }
 
     public void getUnreadCountAsyncForTags(MethodCall call, final Result result) {
@@ -308,7 +332,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
                 result.success(unreadCountStatus);
             }
         };
-        Freshchat.getInstance(context).getUnreadCountAsync(unreadCountCallback, tags);
+        Freshchat.getInstance(activity).getUnreadCountAsync(unreadCountCallback, tags);
     }
 
     public void showConversationsWithOptions(MethodCall call) {
@@ -317,7 +341,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
             String filteredViewTitle = call.argument("filteredViewTitle");
             ConversationOptions conversationOptions = new ConversationOptions();
             conversationOptions.filterByTags(tags, filteredViewTitle);
-            Freshchat.showConversations(context, conversationOptions);
+            Freshchat.showConversations(activity, conversationOptions);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -327,7 +351,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
         try {
             String conversationReferenceID = call.argument("conversationReferenceID");
             String topicName = call.argument("topicName");
-            Freshchat.showConversations(context, conversationReferenceID, topicName);
+            Freshchat.showConversations(activity, conversationReferenceID, topicName);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -336,7 +360,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
     public void setUserWithIdToken(MethodCall call) {
         try {
             String token = call.argument("token");
-            Freshchat.getInstance(context).setUser(token);
+            Freshchat.getInstance(activity).setUser(token);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -345,14 +369,14 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
     public void restoreUserWithIdToken(MethodCall call) {
         try {
             String restoreToken = call.argument("token");
-            Freshchat.getInstance(context).restoreUser(restoreToken);
+            Freshchat.getInstance(activity).restoreUser(restoreToken);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
     }
 
     public String getUserIdTokenStatus() {
-        JwtTokenStatus newTokenStatus = Freshchat.getInstance(context).getUserIdTokenStatus();
+        JwtTokenStatus newTokenStatus = Freshchat.getInstance(activity).getUserIdTokenStatus();
         String status = newTokenStatus.toString();
         return status;
     }
@@ -362,7 +386,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
         String externalId = call.argument("externalId");
         String restoreId = call.argument("restoreId");
         try {
-            Freshchat.getInstance(context).identifyUser(externalId, restoreId);
+            Freshchat.getInstance(activity).identifyUser(externalId, restoreId);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -371,11 +395,11 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
     private void registerBroadcastReceiver(@NonNull final FreshchatSDKBroadcastReceiver receiver, @NonNull final String action) {
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(action);
-        LocalBroadcastManager.getInstance(context).registerReceiver(receiver, intentFilter);
+        LocalBroadcastManager.getInstance(activity).registerReceiver(receiver, intentFilter);
     }
 
     private void unregisterBroadcastReceiver(@NonNull FreshchatSDKBroadcastReceiver receiver) {
-        LocalBroadcastManager.getInstance(context).unregisterReceiver(receiver);
+        LocalBroadcastManager.getInstance(activity).unregisterReceiver(receiver);
     }
 
     private LinkHandler linkHandler = new LinkHandler() {
@@ -390,9 +414,9 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
 
     public void registerForOpeningLink(boolean shouldHandle) {
         if (shouldHandle) {
-            Freshchat.getInstance(context).setCustomLinkHandler(linkHandler);
+            Freshchat.getInstance(activity).setCustomLinkHandler(linkHandler);
         } else {
-            Freshchat.getInstance(context).setCustomLinkHandler(null);
+            Freshchat.getInstance(activity).setCustomLinkHandler(null);
         }
     }
 
@@ -435,14 +459,14 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
                 }
                 break;
             case FRESHCHAT_ACTION_NOTIFICATION_INTERCEPTED:
-                if (shouldRegister){
+                if (shouldRegister) {
                     registerBroadcastReceiver(notificationClickReceiver, Freshchat.FRESHCHAT_ACTION_NOTIFICATION_INTERCEPTED);
                 } else {
                     unregisterBroadcastReceiver(notificationClickReceiver);
                 }
                 break;
             case FRESHCHAT_SET_TOKEN_TO_REFRESH_DEVICE_PROPERTIES:
-                if (shouldRegister){
+                if (shouldRegister) {
                     registerBroadcastReceiver(jwtRefreshEventReceiver, Freshchat.FRESHCHAT_SET_TOKEN_TO_REFRESH_DEVICE_PROPERTIES);
                 } else {
                     unregisterBroadcastReceiver(jwtRefreshEventReceiver);
@@ -455,10 +479,10 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
                 registerForLocaleChangedByWebview(shouldRegister);
                 break;
             case FRESHCHAT_ACTION_USER_INTERACTION:
-                if (shouldRegister){
-                    Freshchat.getInstance(context).setFreshchatUserInteractionListener(userInteractionListener);
-                }else{
-                    Freshchat.getInstance(context).setFreshchatUserInteractionListener(null);
+                if (shouldRegister) {
+                    Freshchat.getInstance(activity).setFreshchatUserInteractionListener(userInteractionListener);
+                } else {
+                    Freshchat.getInstance(activity).setFreshchatUserInteractionListener(null);
                 }
                 break;
             default:
@@ -480,14 +504,14 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
                     .setImportance(importance)
                     .setPriority(priority);
             if (largeIcon != null) {
-                int largeIconId = context.getResources().getIdentifier(largeIcon, "drawable", context.getPackageName());
+                int largeIconId = activity.getResources().getIdentifier(largeIcon, "drawable", activity.getPackageName());
                 freshchatNotificationConfig.setLargeIcon(largeIconId);
             }
             if (smallIcon != null) {
-                int smallIconId = context.getResources().getIdentifier(smallIcon, "drawable", context.getPackageName());
+                int smallIconId = activity.getResources().getIdentifier(smallIcon, "drawable", activity.getPackageName());
                 freshchatNotificationConfig.setSmallIcon(smallIconId);
             }
-            Freshchat.getInstance(context).setNotificationConfig(freshchatNotificationConfig);
+            Freshchat.getInstance(activity).setNotificationConfig(freshchatNotificationConfig);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -496,7 +520,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
     public void setPushRegistrationToken(MethodCall call) {
         try {
             String token = call.argument("token");
-            Freshchat.getInstance(context).setPushRegistrationToken(token);
+            Freshchat.getInstance(activity).setPushRegistrationToken(token);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -519,7 +543,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
         try {
             Map pushPayload = call.argument("pushPayload");
             Bundle pushPayloadBundle = jsonToBundle(pushPayload);
-            Freshchat.handleFcmMessage(context, pushPayloadBundle);
+            Freshchat.handleFcmMessage(activity, pushPayloadBundle);
         } catch (Exception e) {
             Log.e(ERROR_TAG, e.toString());
         }
@@ -537,26 +561,26 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
     public void registerForLocaleChangedByWebview(boolean register) {
         Log.i(LOG_TAG, "registerForLocaleChangedByWebview: " + register);
         if (register) {
-            Freshchat.getInstance(context).setWebviewListener(webviewListener);
+            Freshchat.getInstance(activity).setWebviewListener(webviewListener);
         } else {
-            Freshchat.getInstance(context).setWebviewListener(null);
+            Freshchat.getInstance(activity).setWebviewListener(null);
         }
     }
 
     public void openFreshchatDeeplink(MethodCall call) {
         String link = call.argument("link");
         Log.i(LOG_TAG, "openFreshchatDeeplink: " + link);
-        Freshchat.openFreshchatDeeplink(context, link);
+        Freshchat.openFreshchatDeeplink(activity, link);
     }
 
     public void linkifyWithPattern(MethodCall call) {
         String regex = call.argument("regex");
         String defaultScheme = call.argument("defaultScheme");
-        Freshchat.getInstance(context).linkifyWithPattern(regex, defaultScheme);
+        Freshchat.getInstance(activity).linkifyWithPattern(regex, defaultScheme);
     }
 
     public void notifyAppLocaleChange() {
-        Freshchat.notifyAppLocaleChange(context);
+        Freshchat.notifyAppLocaleChange(activity);
     }
 
     @Override
