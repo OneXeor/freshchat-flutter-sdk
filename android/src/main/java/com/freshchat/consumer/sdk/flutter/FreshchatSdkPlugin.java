@@ -22,7 +22,6 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
 
-
 import com.freshchat.consumer.sdk.ConversationOptions;
 import com.freshchat.consumer.sdk.Event;
 import com.freshchat.consumer.sdk.FaqOptions;
@@ -133,7 +132,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
         return bundle;
     }
 
-    public void init(MethodCall call) {
+    public void init(MethodCall call, Result result) {
         try {
             String appId = call.argument("appId");
             String appKey = call.argument("appKey");
@@ -153,7 +152,9 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
             freshchatConfig.setCameraCaptureEnabled(cameraCaptureEnabled);
             freshchatConfig.setFileSelectionEnabled(fileSelectionEnabled);
             Freshchat.getInstance(context).init(freshchatConfig);
+            result.success(null);
         } catch (Exception e) {
+            result.error("FreshchatSdkPluginError", e.toString(), e);
             Log.e(ERROR_TAG, e.toString());
         }
     }
@@ -566,7 +567,7 @@ public class FreshchatSdkPlugin implements FlutterPlugin, MethodCallHandler {
             switch (call.method) {
 
                 case "init":
-                    init(call);
+                    init(call, result);
                     break;
 
                 case "showFAQ":

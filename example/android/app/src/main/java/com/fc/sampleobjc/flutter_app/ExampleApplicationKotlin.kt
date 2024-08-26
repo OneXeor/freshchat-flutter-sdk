@@ -11,13 +11,13 @@ import io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingBackgroundS
 
 class ExampleApplicationKotlin : FlutterApplication(), PluginRegistrantCallback {
     @Override
-    fun onCreate() {
+    override fun onCreate() {
         super.onCreate()
 //        This is not needed if the flutter version used is v1.12 and above
 //        FlutterFirebaseMessagingBackgroundService.setPluginRegistrant(this)
     }
     @Override
-    fun registerWith(registry: PluginRegistry) {
+    override fun registerWith(registry: PluginRegistry) {
 //        This is not needed if the flutter version used is v1.12 and above
 //        FlutterFirebaseMessagingPlugin.registerWith(registry.registrarFor("io.flutter.plugins.firebasemessaging.FirebaseMessagingPlugin"))
         FreshchatSdkPlugin.register(registry)
